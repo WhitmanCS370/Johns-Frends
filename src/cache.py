@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Feb 21 17:34:06 2024
-
-@author: creek
-"""
 import random
 
 
+# CR: I think that we should rethink the internal data structures used
+# Typically, LRU caches have an O(1) time complexity for insertion, updating, and
+# removing.  I think you can achieve this with either a doubly linked list and a
+# dictionary, or you might consider looking to see if there's a package you can use if
+# you'd prefer.  I'm happy to talk about this more if you want.
+# (Also, this doesn't need to be fixed before we merge PR)
 class Cache:
     """
     This class is for use with the audioObj objects for quicker retrieval
@@ -14,35 +14,27 @@ class Cache:
     """
 
     def __init__(self, size):
-        self.cache = dict()
+        self.cache = {}
+        # CR: What do you think about setting maxCacheSize to something like
+        # min(size, 10000)?
         self.maxCacheSize = size
 
     def getByName(self, name):
         # parse dictionary for sounds that have the given title
-        if name in self.cache:
-            return self.cache[name]
-        return None
+        return self.cache.get(name)
 
-    def getByTags(self, tags):
-        returnVals = []
-        for musicObj in self.cache.values():
-            numOfTagsMatched = 0
-            for tag in musicObj.tags:
-                if tag in tags:
-                    numOfTagsMatched += 1
-            if numOfTagsMatched == len(tags):
-                returnVals.append(musicObj)
-        return returnVals
-
-    def cache(self, soundObj):
+    # CR: I don't know what the right answer is, but I'm not sure if returning
+    # strings from this is a good idea. I think one common idiom is to return True
+    # if something is added (and False if it wasn't added)
+    def cacheData(self, soundObj):
         # check if object is already cached
-        if soundObj.title in self.cache:
+        if soundObj.name in self.cache:
             # update the time accessed and return early
             soundObj.updateLastAccessed()
             return "object already in cache"
-        if not self.isCachFull:  # cache miss with a partially empty cache
+        if not self.isCacheFull():  # cache miss with a partially empty cache
             # add soundObj to cache
-            self.cache[soundObj.title] = soundObj
+            self.cache[soundObj.name] = soundObj
         else:  # cache miss with a full cache
             # evict oldest sound
             titleToEvict = self.getOldestEntry()
@@ -52,9 +44,6 @@ class Cache:
         soundObj.updateLastAccessed()
         return "object cached"
 
-    def removeByName(self, name):
-        raise NotImplementedError
-
     # This should be called before a name change of an audio object
     def rename(self, name, newName):
         if name in self.cache:
@@ -63,13 +52,15 @@ class Cache:
             self.cache[newName] = tempObject
 
     def isCacheFull(self):
-        if len(self.cache) <= self.maxCacheSize:
-            return True
-        return False
+        # CR: return len(self.cache) >= self.maxCacheSize
+        if len(self.cache) < self.maxCacheSize:
+            return False
+        return True
 
     def getOldestEntry(self):
-        oldest = random.choice(list(self.cache.items()))
-        for soundObj in self.cache:
-            if soundObj.last_accessed > oldest.last_accessed:
-                oldest = soundObj
-        return oldest
+        # CR: Why are we initializing oldest to a random value?
+        _, oldest = random.choice(list(self.cache.items()))
+        for name in self.cache:
+            if self.cache[name].last_accessed < oldest.last_accessed:
+                oldest = self.cache[name]
+        return oldest.name
